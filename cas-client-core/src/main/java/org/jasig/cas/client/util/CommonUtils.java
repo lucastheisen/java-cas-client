@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.text.DateFormat;
@@ -32,8 +34,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 import javax.servlet.http.HttpServletRequest;
@@ -69,11 +69,6 @@ public final class CommonUtils {
      */
     private static final String PARAM_PROXY_GRANTING_TICKET = "pgtId";
     
-    /**
-     * A pattern to parse a server name into scheme, host, and port
-     */
-    private static final Pattern PATTERN_SERVER_NAME = Pattern.compile("(?:(https?)://)?([^:]*):?(\\d+)?");
-
     private static final HttpURLConnectionFactory DEFAULT_URL_CONNECTION_FACTORY = new HttpsURLConnectionFactory();
 
     private CommonUtils() {
@@ -290,24 +285,22 @@ public final class CommonUtils {
 
         final String serverName = findMatchingServerName(request, serverNames);
 
-        String scheme = null;
-        String hostname = null;
-        int port = -1;
-
-        // parser serverName to see which parts it defines
-        Matcher matcher = PATTERN_SERVER_NAME.matcher(serverName);
-        if (matcher.find()) {
-            if (matcher.group(1) != null) {
-                scheme = matcher.group(1);
-            }
-            hostname = matcher.group(2);
-            if (matcher.group( 3 ) != null) {
-                port = Integer.parseInt(matcher.group(3));
-            }
+        URI serverUri;
+        try {
+            serverUri = new URI( serverName );
+            LOGGER.info( "serverName = [{}], hostname = [{}], path=[{}]",
+                    new Object[] {
+                            serverName,
+                            serverUri.getHost(),
+                            serverUri.getPath()
+                    } );
         }
-        else {
-            throw new IllegalArgumentException( "serverName [" + serverName + "] is invalid" );
+        catch (URISyntaxException e) {
+            throw new IllegalArgumentException("serverName [" + serverName + "] is invalid: " + e.getMessage(), e);
         }
+        String scheme = serverUri.getScheme();
+        String hostname = serverUri.getHost();
+        int port = serverUri.getPort();
 
         if (scheme == null) {
             String forwardedScheme = request.getHeader("X-Forwarded-Proto");
